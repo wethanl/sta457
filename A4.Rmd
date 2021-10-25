@@ -1,0 +1,169 @@
+---
+title: "457 A4"
+author: "Wenxi Li"
+date: "05/04/2021"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+## 1
+### a
+We could notice from the graph that it is not a stationary process since its expectation of th mean clearly varies with time, so we can take the difference of the series. Now the expecation of the mean stays constant. We further notice that the graph now has an increasing of variance. So we take the log of the series, and now the series looks like a stationary process. So we set d=1.
+
+Now we plot the ACF and PACF, and we notice that ACF is cutting off at around lag 1.8 and PACF is cutting off at around 2 or 4. So we propose two models, ARIMA(1.8,1,2) and ARIMA(1.8,1,4).
+
+```{r}
+library(astsa)
+plot.ts(oil,ylab='Price of Oil per Barrel',xlab="Year",main='Oil Price Change over Year') #plot the oil seires
+plot.ts(diff(oil),ylab='Price of Oil per Barrel',xlab="Year",main='Oil Price Change over Year') #plot the first differenced series
+plot.ts(diff(log(oil)),ylab='Price of Oil per Barrel',xlab="Year",main='Oil Price Change over Year') #plot the log of the first differenced series
+
+acf2(diff(log(oil))) #plot the acf and pacf
+```
+### b
+For the model ARIMA(1.8,1,2), the estimate for ar1, ma1, ma2 and the xmean are -0.4501,0.6251,-0.0446 and 0.0018 respectively. P-values for ar1 and ma1 are smaller than 0.05 indicating they are statistically significant, and the other three are greater than 0.05 indicating they are not statistically significant.
+
+For the model ARIMA(1.8,1,2), the estimate for ar1, ma1, ma2, ma3, ma4 and the xmean are -0.9769, 1.1635, 0.0741, 0.0627, 0.1787, and 0.0017 respectively. P-values for ar1 , ma1 and ma4 are smaller than 0.05 indicating they are statistically significant, and the other three are greater than 0.05 indicating they are not statistically significant.
+```{r}
+model1<-sarima(diff(log(oil)),1.8,0,2)  #fit the arima model (1.8,1,2)
+model2<-sarima(diff(log(oil)),1.8,0,4)  #fit the arima model (1.8,1,4)
+model1
+model2
+model1$BIC #find the BIC of model1
+model2$BIC #find the BIC of model2
+model1$AIC #find the AIC of model1
+model2$AIC #find the AIC of model2
+```
+### c
+From the diagnostic tests, we see that the tandardized residuals for both of the models show no obvious pattern. Most of the residuals of the two models follow the normal distribution with a few outliers, so the assumption of normality of residuals is not violated. And most of the lag for the acf of residuals from the two models are within the range indicating they are non-significant at the 0.05 level and the randomness assumption is not violated. However, we notice that the Ljung-Box statistic for the model ARIMA(1.8,1,2) is indicating the residuals are dependent since most of the points are below the 0.05 dotted line. While for the model ARIMA(1.8,1,4), most of the points are above the 0.05 dotted line, indicating that the residuals are independent of each other.
+
+So we choose to use ARIMA(1.8,1,4) for prediction.
+
+### d
+```{r}
+pred10 <-sarima.for(oil,10,1.8,1,10) #predict for ten weeks
+upper <-pred10$pred+qnorm(0.975)*pred10$se #the upper bound for the 95% confident interval
+lower <-pred10$pred-qnorm(0.975)*pred10$se #the lower bound for the 95% confident interval
+
+data.frame("Prediction"=pred10$pred,"PI 95% Lower Bound"=lower,"PI 95% Upper Bound"=upper) #report the 95% confident interval for the next ten years
+```
+### e
+We do see that there're some ouliers at the two ends of the normal Q-Q plot which may cause our prediction to be less accurate.
+
+## 2
+### a
+By increasing the sample size, we could observe more periods of these four periodic series with the same frequency or the ampilitude as in the example.
+```{r}
+n=128 #set n
+t<-c(1:n) #set t
+x_1t<-2*cos(2*pi*0.06*t) + 3*sin(2*pi*0.06*t) #set x1t
+x_2t<-4*cos(2*pi*0.10*t) + 5*sin(2*pi*0.10*t) #set x2t
+x_3t<-6*cos(2*pi*0.40*t) + 7*sin(2*pi*0.40*t) #set x3t
+xt=x_1t+x_2t+x_3t #calculate xt
+
+par(mfrow=c(2,2))
+plot.ts(x_1t,ylim=c(-5,5),main='Frequency=0.06, Squred Amplitute=13') #plot x1t
+plot.ts(x_2t,ylim=c(-10,10),main='Frequency=0.10, Squred Amplitute=41') #plot x2t
+plot.ts(x_3t,ylim=c(-10,10),main='Frequency=0.40, Squred Amplitute=85') #plot x3t
+plot.ts(xt,ylim=c(-20,20),main='x1t+x2t+x3t') #plot xt
+```
+
+
+### b
+The periodogram graph of xt is similar to what we have in examle 4.2, where it has six peak frequency. Each of the peak has similar frequency to those in example 4.2; both of the most significant frequency happens at 0.4 and 0.6. We also see that the amplitude of the graph we got is lower than that in example 4.2 since we did not consider white noise.
+```{r}
+period<-Mod(2*fft(xt/127))^2 #get the fourier transform
+freq<-c(0:(n-1)/128) #calculate the frequency
+plot(freq,period,type='o',ylab='periodogram',xlab = 'frequency',main = 'Scaled Periodogram of xt') #plot the periodogram
+```
+
+### c
+After adding the white noise to the series, we now observe that two periodogram have similar amplitude. The six peaks are also happening at the same frequency. Even though we do not have the exact same pattern as it is shown in example 4.2 due to the random white noise, we could still conclude that now the diagrams shows the similar pattern to example 4.2.
+```{r}
+n1=100 #set the new n
+t1<-c(1:n1) #set the new t
+set.seed(5738) #set seed
+wn<-rnorm(100,0,5) #generate white noise
+x_1ct<-2*cos(2*pi*0.06*t1) + 3*sin(2*pi*0.06*t1) #set x1t
+x_2ct<-4*cos(2*pi*0.10*t1) + 5*sin(2*pi*0.10*t1) #set x2t
+x_3ct<-6*cos(2*pi*0.40*t1) + 7*sin(2*pi*0.40*t1) #set x3t
+x_ct<-x_1ct+x_2ct+x_3ct+wn #set xct
+
+par(mfrow=c(2,2))
+plot.ts(x_1ct,ylim=c(-5,5),main='Frequency=0.06, Squred Amplitute=13') #plot x1t
+plot.ts(x_2ct,ylim=c(-10,10),main='Frequency=0.10, Squred Amplitute=41') #plot x2t
+plot.ts(x_3ct,ylim=c(-10,10),main='Frequency=0.40, Squred Amplitute=85') #plot x3t
+plot.ts(x_ct,ylim=c(-20,20),main='x1ct+x2ct+x3ct+white noise') #plot xct
+
+period_c<-Mod(2*fft(xt/127))^2 #get the fourier transform
+freq_c<-c(0:(n-1)/128) #get the frequency
+
+```
+```{r}
+plot(freq_c,period_c,type='o',ylim=c(0,80),ylab='periodogram',xlab = 'frequency',main = 'Scaled Periodogram of xt with white noise') #plot the new periodogram
+```
+
+
+
+## 3
+### a
+
+The first three dominant frequencies of salt series are 0.0625, 0.0469 and 0.1094.
+The first three dominant frequencies of saltemp series are 0.0625, 0.0469 and 0.4375.
+
+```{r}
+plot.ts(salt) #plot the time series of salt
+plot.ts(saltemp) #plot the time series of saltemp
+
+s<-mvspec(salt) #do the spectral analyses
+st<-mvspec(saltemp) #spectral analyses fot the second seires
+
+s_ordered<-s$details[order(s$details[,3],decreasing= T),] #order the spectrum from the largest to the lowest for the first series
+s_ordered
+
+st_ordered<-st$details[order(st$details[,3],decreasing= T),]  #order the spectrum from the largest to the lowest for the second series
+st_ordered
+
+
+
+soi.ave = mvspec(soi, kernel('daniell',4))
+abline(v=c(.25,1,2,3), lty=2)
+a<-soi.ave$details[order(soi.ave$details[,3],decreasing= T),] 
+```
+
+### b
+
+For the dominant frequency 0.0625 of the salt series, the 95% confidence interval is (16.4458,2396.1988).
+For the dominant frequency 0.0625 of the saltemp series, the 95% confidence interval is (0.6609,96.2919).
+
+For the second dominant frequency 0.0469 of the salt series, the 95% confidence interval is (9.0775,1322.6220).
+For the dominant frequency 0.0469 of the saltemp series, the 95% confidence interval is (0.3209,46.7497).
+
+For the third dominant frequency 0.1094 of the salt series, the 95% confidence interval is (6.4221,935.7169).
+For the third dominant frequency 0.4375 of the saltemp series, the 95% confidence interval is (0.1722,25.0930).
+
+As shown, all the 95% confident interval are very wide. And it is not generally useful for predicting things.
+
+```{r}
+upper_salt1<-2*60.6665/qchisq(0.025,2) #find the upper limit of the greatest spectrum of the salt series
+lower_salt1<-2*60.6665/qchisq(0.975,2) #find the lower limit of the greatest spectrum of the salt series
+upper_saltemp1<-2*2.4379/qchisq(0.025,2) #find the upper limit of the greatest spectrum of the saltemp series
+lower_saltemp1<-2*2.4379/qchisq(0.975,2) #find the lower limit of the greatest spectrum of the saltemp series
+
+
+
+upper_salt2<-2*33.4859/qchisq(0.025,2) #find the upper limit of the second largest spectrum of salt series
+lower_salt2<-2*33.4859/qchisq(0.975,2) #find the lower limit of the second largest spectrum of salt series
+upper_saltemp2<-2*1.1836/qchisq(0.025,2) #find the lower limit of the second largest spectrum of saltemp series
+lower_saltemp2<-2*1.1836/qchisq(0.975,2) #find the lower limit of the second largest spectrum of saltemp series
+
+
+upper_salt3<-2*23.6903/qchisq(0.025,2) #find the upper limit of the third largest spectrum of salt series
+lower_salt3<-2*23.6903/qchisq(0.975,2) #find the lower limit of the third largest spectrum of salt series
+upper_saltemp3<-2*0.6353/qchisq(0.025,2) #find the lower limit of the third largest spectrum of saltemp series
+lower_saltemp3<-2*0.6353/qchisq(0.975,2) #find the lower limit of the thrid largest spectrum of saltemp series
+
+
+```
+
